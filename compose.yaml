@@ -1,0 +1,8 @@
+services:
+  anime-music:
+    build: .
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - "${DOWNLOAD_DIR:-./downloads}:/downloads"
+    restart: unless-stopped

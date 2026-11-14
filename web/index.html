@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anime Music Downloader</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">ANISONGDB</p>
+      <h1>Anime Music Downloader</h1>
+      <p>Cerca sigle e tracce anime e salvale nella cartella configurata.</p>
+    </header>
+    <form id="search-form" class="search">
+      <label class="query">Cerca
+        <input id="query" type="search" placeholder="Titolo, anime o artista..." maxlength="500">
+      </label>
+      <label>Categoria
+        <select id="category">
+          <option>Anime</option><option>Tutti</option><option>Titolo</option>
+          <option>Artista</option><option>Compositore</option>
+        </select>
+      </label>
+      <button id="search-button" type="submit">Cerca</button>
+      <button id="advanced-button" type="button" aria-expanded="false">Ricerca avanzata</button>
+      <button id="options-button" type="button">Opzioni</button>
+    </form>
+    <section id="advanced" hidden aria-labelledby="advanced-title">
+      <h2 id="advanced-title">Ricerca avanzata</h2>
+      <div id="advanced-fields" class="advanced-fields"></div>
+      <fieldset><legend>Opzioni di ricerca</legend>
+        <label><input id="and-logic" type="checkbox"> Tutti i campi (AND), altrimenti almeno uno (OR)</label>
+        <label><input id="arrangement" type="checkbox" checked> Includi arrangiamenti nella ricerca compositore</label>
+        <label><input id="include-no-links" type="checkbox" checked> Includi brani senza collegamenti</label>
+        <label><input id="ignore-duplicate" type="checkbox"> Ignora duplicati</label>
+        <label>Max altri artisti <input id="max-other" type="number" min="0" max="99" value="99"></label>
+        <label>Min membri gruppo <input id="group-size" type="number" min="0" max="99" value="0"></label>
+      </fieldset>
+      <h3>Song Filters</h3>
+      <div id="filter-groups" class="filter-groups"></div>
+      <div class="range-fields">
+        <label>Season <input id="season-range" placeholder="Spring 2020 - Fall 2024"></label>
+        <label>Difficulty <input id="difficulty-range" placeholder="0 - 100"></label>
+      </div>
+    </section>
+    <dialog id="options-dialog" aria-labelledby="options-title">
+      <form id="options-form">
+        <h2 id="options-title">Opzioni di output</h2>
+        <label>Formato audio
+          <select id="output-format">
+            <option value="originale">Originale (MP3 per video)</option>
+            <option value="mp3">MP3</option>
+            <option value="aac">AAC</option>
+          </select>
+        </label>
+        <label>Modello nome file
+          <input id="filename-template" type="text" maxlength="200" required>
+        </label>
+        <label>Nome anime visualizzato
+          <select id="anime-language"><option value="EN">Inglese (EN)</option><option value="JP">Giapponese (JP)</option></select>
+        </label>
+        <p>Segnaposto: <code>{anime}</code>, <code>{titolo}</code>, <code>{artista}</code>, <code>{anno}</code>, <code>{season}</code>, <code>{tipo}</code>.</p>
+        <p>Esempio: <code>{anime} - {titolo} - {artista}</code>. L'estensione viene aggiunta automaticamente.</p>
+        <p id="options-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-options">Annulla</button>
+          <button type="submit" id="save-options">Salva</button>
+        </div>
+      </form>
+    </dialog>
+    <section aria-labelledby="results-title">
+      <div class="section-header">
+        <div><h2 id="results-title">Risultati</h2><p id="count">Nessuna ricerca effettuata</p></div>
+        <div class="result-actions">
+          <button id="columns-button" type="button">Colonne</button>
+          <button id="download" type="button" disabled>Scarica selezionati</button>
+        </div>
+      </div>
+      <p id="status" role="status" aria-live="polite">Inserisci un termine per iniziare.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="result-header">
+            <th><input type="checkbox" id="select-all" aria-label="Seleziona tutte le tracce disponibili"></th>
+          </tr></thead>
+          <tbody id="results"></tbody>
+        </table>
+      </div>
+      <div id="errors" role="alert"></div>
+    </section>
+    <dialog id="columns-dialog" aria-labelledby="columns-title">
+      <h2 id="columns-title">Colonne visibili</h2>
+      <p>Usa le frecce per riordinare le colonne; la casella di selezione delle tracce resta sempre all'inizio.</p>
+      <p id="column-order-error" role="alert"></p>
+      <div id="column-options" class="column-options"></div>
+      <div class="dialog-actions"><button type="button" id="close-columns">Chiudi</button></div>
+    </dialog>
+    <dialog id="info-dialog" aria-labelledby="info-title">
+      <div class="section-header"><h2 id="info-title">Dettagli traccia</h2><button type="button" id="close-info">Chiudi</button></div>
+      <div id="info-content"></div>
+    </dialog>
+    <audio id="audio-player" controls hidden></audio>
+    <footer>Le tracce possono essere estratti brevi. Scarica i contenuti solo se disponi delle autorizzazioni necessarie.</footer>
+  </main>
+</body>
+</html>
