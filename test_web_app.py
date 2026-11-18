@@ -83,7 +83,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(data), {"filename": "song.mp3"})
         get_song.assert_called_once_with(3)
-        download.assert_called_once_with(song, Path(tmp), "originale", "{artista} - {titolo}")
+        download.assert_called_once_with(song, Path(tmp), "originale", "{Artist} - {Song Name}", "EN", None)
 
     def test_options_validation_and_download(self):
         options = {"format": "aac", "template": "{anime} - {titolo}"}
@@ -94,10 +94,23 @@ class WebTests(unittest.TestCase):
             status, data = self.post("/api/download", {"id": 3, **options})
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(data)["filename"], "output.aac")
-            download.assert_called_once_with({"annSongId": 3}, web_app.DOWNLOAD_DIR, "aac", options["template"])
+            download.assert_called_once_with({"annSongId": 3}, web_app.DOWNLOAD_DIR, "aac", options["template"], "EN", None)
             lookup.reset_mock()
             status, data = self.post("/api/download", {"id": 3, "format": "wav", "template": "{titolo}"})
             self.assertEqual(status, 400)
+            lookup.assert_not_called()
+
+    def test_download_language_and_row_number(self):
+        with patch.object(web_app, "get_song", return_value={"annSongId": 3}) as lookup, \
+             patch.object(web_app, "download_song", return_value=Path("output.mp3")) as download:
+            status, _ = self.post("/api/download", {
+                "id": 3, "format": "mp3", "template": "{Row Number} - {Anime}", "language": "JP", "row_number": 12
+            })
+            self.assertEqual(status, 200)
+            download.assert_called_once_with({"annSongId": 3}, web_app.DOWNLOAD_DIR, "mp3", "{Row Number} - {Anime}", "JP", 12)
+            lookup.reset_mock()
+            self.assertEqual(self.post("/api/download", {"id": 3, "language": "FR"})[0], 400)
+            self.assertEqual(self.post("/api/download", {"id": 3, "row_number": True})[0], 400)
             lookup.assert_not_called()
 
     def test_denies_cross_origin_and_foreign_host(self):
@@ -109,6 +122,22 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.request("POST", "/api/download", "{}", {
             "Origin": f"http://{self.host}", "Content-Type": "text/plain"
         })[0], 415)
+
+    def test_private_network_hosts_and_origin_checks(self):
+        for address in ("192.168.1.4", "10.0.0.1", "172.16.0.1", "172.31.255.255"):
+            host = f"{address}:8080"
+            with self.subTest(address=address), patch.object(web_app, "search_songs", return_value=[]):
+                self.assertEqual(self.request("GET", "/", headers={"Host": host})[0], 200)
+                self.assertEqual(self.request("POST", "/api/search", '{"query":"abc","category":"Anime"}', {
+                    "Host": host, "Origin": f"http://{host}", "Content-Type": "application/json"
+                })[0], 200)
+                self.assertEqual(self.request("POST", "/api/search", "{}", {
+                    "Host": host, "Origin": "http://evil.example", "Content-Type": "application/json"
+                })[0], 403)
+        for host in ("172.15.255.255:8080", "172.32.0.1:8080", "8.8.8.8:8080",
+                     "192.168.1.4.evil.example:8080", "192.168.001.4:8080"):
+            with self.subTest(host=host):
+                self.assertEqual(self.request("GET", "/", headers={"Host": host})[0], 403)
 
     def test_download_and_upstream_errors_are_visible(self):
         with patch.object(web_app, "get_song", side_effect=ValueError("traccia non trovata")):

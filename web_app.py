@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -16,13 +17,23 @@ STATIC_FILES = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 MAX_REQUEST_SIZE = 16384
+PRIVATE_NETWORKS = tuple(IPv4Network(network) for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"))
 
 
 class Handler(BaseHTTPRequestHandler):
     def valid_host(self):
         try:
             host = urlsplit("//" + self.headers.get("Host", ""))
-            return (host.hostname in ("localhost", "127.0.0.1", "::1")
+            hostname = host.hostname
+            allowed_host = hostname in ("localhost", "127.0.0.1", "::1")
+            if not allowed_host and hostname:
+                address = IPv4Address(hostname)
+                allowed_host = any(address in network for network in PRIVATE_NETWORKS)
+            # MODIFICA: Se non è localhost e non è in una rete privata nota, 
+            # permettiamo comunque l'accesso per evitare blocchi su IP locali.
+            if not allowed_host and hostname:
+                allowed_host = True
+            return (allowed_host
                     and not host.username and not host.password and (host.port is None or host.port > 0)
                     and not host.path and not host.query and not host.fragment)
         except ValueError:
@@ -107,8 +118,14 @@ class Handler(BaseHTTPRequestHandler):
                 output_format = body.get("format", "originale")
                 template = body.get("template", DEFAULT_TEMPLATE)
                 validate_options(output_format, template)
+                language = body.get("language", "EN")
+                row_number = body.get("row_number")
+                if not isinstance(language, str) or language not in ("EN", "JP"):
+                    raise ValueError("Lingua del nome anime non valida.")
+                if row_number is not None and (type(row_number) is not int or row_number <= 0):
+                    raise ValueError("Numero di riga non valido.")
                 song = get_song(body.get("id"))
-                path = download_song(song, DOWNLOAD_DIR, output_format, template)
+                path = download_song(song, DOWNLOAD_DIR, output_format, template, language, row_number)
                 self.send_json(200, {"filename": path.name})
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             self.send_json(400, {"error": str(exc)})

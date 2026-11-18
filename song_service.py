@@ -19,9 +19,19 @@ SEARCH_FIELDS = {
     "Artista": "artist_search_filter",
     "Compositore": "composer_search_filter",
 }
-DEFAULT_TEMPLATE = "{artista} - {titolo}"
+DEFAULT_TEMPLATE = "{Artist} - {Song Name}"
 OUTPUT_FORMATS = ("originale", "mp3", "aac")
-TEMPLATE_FIELDS = ("anime", "titolo", "artista", "anno", "season", "tipo")
+TEMPLATE_COLUMNS = (
+    "Row Number", "ANN ID", "ANN Song ID", "AMQ Song ID", "Season", "Anno",
+    "Anime Type", "Anime", "Broadcast", "Song Type", "Performance", "Song Name",
+    "Artist", "Composer", "Arranger", "Difficulty", "Length", "Sorgente",
+)
+TEMPLATE_ALIASES = {
+    "anime": "Anime", "titolo": "Song Name", "artista": "Artist",
+    "anno": "Anno", "season": "Season", "tipo": "Song Type",
+    "Titolo": "Song Name", "Artista": "Artist", "Tipo": "Song Type",
+}
+TEMPLATE_FIELDS = TEMPLATE_COLUMNS + tuple(TEMPLATE_ALIASES)
 
 
 def anime_year(song):
@@ -198,15 +208,38 @@ def validate_options(output_format, template):
             raise ValueError("Segnaposto non valido. Usa: " + ", ".join("{" + name + "}" for name in TEMPLATE_FIELDS))
 
 
-def filename_for_song(song, template):
+def filename_for_song(song, template, language="EN", row_number=None):
+    if not isinstance(language, str) or language not in ("EN", "JP"):
+        raise ValueError("Lingua del nome anime non valida.")
+    if row_number is not None and (type(row_number) is not int or row_number <= 0):
+        raise ValueError("Numero di riga non valido.")
+    anime = (song.get("animeJPName") or song.get("animeENName")) if language == "JP" else (
+        song.get("animeENName") or song.get("animeJPName"))
+    dub, rebroadcast = song.get("isDub"), song.get("isRebroadcast")
+    broadcast = "Dub/Rebroadcast" if dub and rebroadcast else "Dub" if dub else "Rebroadcast" if rebroadcast else "Normal"
     values = {
-        "anime": song.get("animeENName") or song.get("animeJPName") or "Anime sconosciuto",
-        "titolo": song.get("songName") or "Senza titolo",
-        "artista": song.get("songArtist") or "Artista sconosciuto",
-        "anno": anime_year(song) or "Anno sconosciuto",
-        "season": song.get("animeVintage") or "Season sconosciuta",
-        "tipo": song.get("songType") or "Tipo sconosciuto",
+        "Row Number": row_number,
+        "ANN ID": song.get("annId"),
+        "ANN Song ID": song.get("annSongId"),
+        "AMQ Song ID": song.get("amqSongId"),
+        "Season": song.get("animeVintage") or "Season sconosciuta",
+        "Anno": anime_year(song) or "Anno sconosciuto",
+        "Anime Type": song.get("animeType"),
+        "Anime": anime or "Anime sconosciuto",
+        "Broadcast": broadcast,
+        "Song Type": song.get("songType") or "Tipo sconosciuto",
+        "Performance": song.get("songCategory"),
+        "Song Name": song.get("songName") or "Senza titolo",
+        "Artist": song.get("songArtist") or "Artista sconosciuto",
+        "Composer": song.get("songComposer"),
+        "Arranger": song.get("songArranger"),
+        "Difficulty": song.get("songDifficulty"),
+        "Length": song.get("songLength"),
+        "Sorgente": "Audio" if song.get("audio") else "Video" if song.get("HQ") or song.get("MQ") else "Non disponibile",
     }
+    values = {key: "Non disponibile" if value is None or value == "" else str(value)
+              for key, value in values.items()}
+    values.update({alias: values[column] for alias, column in TEMPLATE_ALIASES.items()})
     return safe_filename(template.format_map(values))
 
 
@@ -230,7 +263,30 @@ def copy_media(url, output):
         raise RuntimeError(f"Download non riuscito: {exc}") from exc
 
 
-def download_song(song, directory, output_format="originale", template=DEFAULT_TEMPLATE):
+def write_metadata(file_path, song_data):
+    """Scrive i metadati nei file audio (MP3, AAC)."""
+    try:
+        path = Path(file_path)
+        if not path.exists():
+            return
+
+        if path.suffix.lower() == ".mp3":
+            audio = MP3(file_path)
+            audio.info.title = song_data.get("songName") or "Senza Titolo"
+            audio.info.artist = song_data.get("songArtist") or "Sconosciuto"
+            audio.info.album = song_data.get("animeENName") or "Senza Album"
+            audio.save()
+        elif path.suffix.lower() == ".aac":
+            audio = AAC(file_path)
+            audio.texts[0] = {"title": song_data.get("songName") or "Senza Titolo", "content": song_data.get("songName") or "Senza Titolo"}
+            audio.texts[1] = {"title": "Artist", "content": song_data.get("songArtist") or "Sconosciuto"}
+            audio.save()
+    except Exception as e:
+        logging.error(f"Errore durante la scrittura dei metadati: {e}")
+
+# ... (altre funzioni esistenti) ...
+
+def download_song(song, directory, output_format="originale", template=DEFAULT_TEMPLATE, language="EN", row_number=None):
     validate_options(output_format, template)
     directory = Path(directory)
     if not directory.is_dir():
@@ -240,7 +296,7 @@ def download_song(song, directory, output_format="originale", template=DEFAULT_T
     if not audio and not video:
         raise ValueError("Nessun file audio o video disponibile per questa traccia.")
     source = media_url(audio or video)
-    name = filename_for_song(song, template)
+    name = filename_for_song(song, template, language, row_number)
     original_extension = Path(urlparse(source).path).suffix.lower() if audio else ""
     if audio and original_extension not in {".mp3", ".m4a", ".ogg", ".opus", ".wav", ".flac", ".aac"}:
         raise ValueError("Formato audio non riconosciuto.")
@@ -269,8 +325,13 @@ def download_song(song, directory, output_format="originale", template=DEFAULT_T
                 )
                 if result.returncode:
                     raise RuntimeError(f"FFmpeg non è riuscito a estrarre l'audio: {result.stderr.strip()}")
+        
+        # NUOVA LOGICA: Scrivi i metadati dopo il successo del download
+        write_metadata(str(path), song)
+        
         return path
     except Exception:
         output.close()
         path.unlink(missing_ok=True)
         raise
+

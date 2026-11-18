@@ -20,7 +20,7 @@ const optionsError = document.querySelector("#options-error");
 const saveOptions = document.querySelector("#save-options");
 const cancelOptions = document.querySelector("#cancel-options");
 const storageKey = "animeMusicOutputOptions";
-let options = {format: "originale", template: "{artista} - {titolo}", language: "EN"};
+let options = {format: "originale", template: "{Artist} - {Song Name}", language: "EN"};
 let busy = false;
 let sortColumn = null;
 let sortAscending = true;
@@ -212,6 +212,7 @@ function buildRow(song, index) {
   checkbox.type = "checkbox"; checkbox.value = song.id;
   checkbox.dataset.available = String(Number.isSafeInteger(song.id) && song.id > 0 && Boolean(song.source));
   checkbox.dataset.title = song.title || "Senza titolo";
+  checkbox.dataset.rowNumber = String(index + 1);
   checkbox.disabled = true;
   checkbox.setAttribute("aria-label", `Seleziona ${checkbox.dataset.title}`);
   checkbox.addEventListener("change", updateSelection);
@@ -549,7 +550,7 @@ downloadButton.addEventListener("click", async () => {
   for (const [index, box] of selected.entries()) {
     status.textContent = `Download ${index + 1}/${selected.length}: ${box.dataset.title}`;
     try {
-      await post("/api/download", {id: Number(box.value), ...options});
+      await post("/api/download", {id: Number(box.value), row_number: Number(box.dataset.rowNumber), ...options});
       box.checked = false;
       completed++;
     } catch (error) {

@@ -10,37 +10,38 @@ Installa e avvia Docker Desktop con i container Linux abilitati. In PowerShell, 
 docker compose up -d --build
 ```
 
-Apri **http://localhost:8080**. I download sono salvati nella cartella `downloads` del progetto sul computer che esegue Docker, non nella cartella predefinita del browser. FFmpeg è incluso nell'immagine.
+Apri **http://localhost:8080** sul server oppure, da un altro dispositivo della rete, usa l'indirizzo IP del server, ad esempio **http://192.168.1.4:8080**. Sostituisci l'indirizzo con quello effettivo del server e consenti, se necessario, la porta TCP nel suo firewall. I download sono salvati nella cartella `downloads` del progetto sul computer che esegue Docker, non nella cartella predefinita del browser. FFmpeg è incluso nell'immagine.
 
-### Porta e cartella
+### Indirizzo, porta e cartella
 
 Modifica i valori predefiniti direttamente in `compose.yaml`:
 
 ```yaml
 ports:
-  - "127.0.0.1:8080:8080"
+  - "0.0.0.0:8080:8080"
 volumes:
   - "./downloads:/downloads"
 ```
 
-Per esempio, sostituisci il primo `8080` per cambiare la porta del computer e `./downloads` con la cartella desiderata. Lascia invariati il secondo `8080` e `/downloads`, che sono i valori nel container.
+Per esempio, sostituisci il primo `8080` per cambiare la porta del computer e `./downloads` con la cartella desiderata. Lascia invariati il secondo `8080` e `/downloads`, che sono i valori nel container. `0.0.0.0` pubblica la porta su tutte le interfacce IPv4; puoi sostituirlo con l'indirizzo IP locale del server per limitarla a quell'interfaccia, oppure con `127.0.0.1` per consentire solo accessi locali.
 
-In alternativa, senza modificare il file, imposta le variabili `APP_PORT` e `DOWNLOAD_DIR` in un file `.env` nella stessa cartella di `compose.yaml`:
+In alternativa, senza modificare il file, imposta le variabili `APP_BIND_ADDRESS`, `APP_PORT` e `DOWNLOAD_DIR` in un file `.env` nella stessa cartella di `compose.yaml`:
 
 ```dotenv
+APP_BIND_ADDRESS=192.168.1.4
 APP_PORT=8090
 DOWNLOAD_DIR=./musica
 ```
 
-Per un percorso assoluto su Windows, ad esempio: `DOWNLOAD_DIR=C:\Users\Nome\Music\Anime`. Accertati che il percorso sia accessibile e scrivibile da Docker Desktop. Dopo ogni modifica ricrea il container:
+`APP_BIND_ADDRESS` deve essere un indirizzo presente sul server; omettilo per usare `0.0.0.0`. Per un percorso assoluto su Windows, ad esempio: `DOWNLOAD_DIR=C:\Users\Nome\Music\Anime`. Accertati che il percorso sia accessibile e scrivibile da Docker Desktop. Dopo ogni modifica ricrea il container:
 
 ```powershell
 docker compose up -d
 ```
 
-Con l'esempio sopra apri **http://localhost:8090**. Per fermare il servizio usa `docker compose down`; i file scaricati restano nella cartella scelta.
+Con l'esempio sopra apri **http://192.168.1.4:8090**; quando la porta è associata solo a quell'interfaccia, `localhost` potrebbe non funzionare. Per fermare il servizio usa `docker compose down`; i file scaricati restano nella cartella scelta.
 
-Il servizio non ha autenticazione ed è pubblicato solo su localhost: non esporlo su Internet o sulla rete. La pagina deve rimanere aperta durante i download selezionati.
+Il servizio non ha autenticazione: chiunque possa raggiungerlo può usarlo e avviare download sul server. L'app accetta indirizzi IPv4 privati (10.x.x.x, 172.16–31.x.x e 192.168.x.x) e localhost, non nomi host personalizzati. Il controllo dell'indirizzo non sostituisce un firewall: limita l'accesso alla rete fidata e non esporre la porta su Internet. La pagina deve rimanere aperta durante i download selezionati.
 
 ## Utilizzo
 
@@ -56,7 +57,7 @@ Nella versione web, **Colonne** permette di scegliere i campi visibili e riordin
 
 ### Opzioni di output
 
-Il pulsante **Opzioni** consente di scegliere il formato audio **Originale**, **MP3** o **AAC** e di personalizzare il modello del nome. Ad esempio, `{anime} - {titolo} - {artista}` produce un nome come `Naruto - Rise - Artista.mp3`. Sono disponibili anche `{anno}`, `{season}` e `{tipo}`. Non inserire l'estensione nel modello: viene aggiunta automaticamente. I caratteri non validi nei nomi dei file vengono sostituiti.
+Il pulsante **Opzioni** consente di scegliere il formato audio **Originale**, **MP3** o **AAC** e di personalizzare il modello del nome con i nomi delle colonne, ad esempio `{Anime} - {Song Name} - {Artist}`. Sono disponibili tutti i campi testuali e numerici elencati nella finestra, inclusi `{Season}`, `{Anno}`, `{Song Type}` e gli ID; le colonne con pulsanti o collegamenti non sono utilizzabili nel nome. `{Anime}` usa la lingua EN o JP scelta nelle opzioni, con ripiego sull'altra lingua se necessario. `{Row Number}` è il numero originario del risultato, non cambia ordinando le righe ed è disponibile nella versione web; nella versione desktop compare `Non disponibile`. I dati mancanti vengono indicati nel nome. I precedenti segnaposto minuscoli restano validi. Non inserire l'estensione nel modello: viene aggiunta automaticamente. I caratteri non validi nei nomi dei file vengono sostituiti.
 
 Il formato predefinito conserva l'audio originale; per i video estrae un MP3. MP3 o AAC convertono l'audio se necessario tramite FFmpeg (incluso nel container), quindi possono comportare una ricodifica con perdita di qualità; se è già nel formato scelto, il file viene copiato senza conversione. Le opzioni web sono salvate nel browser e valgono per i successivi download; nella GUI desktop valgono fino alla chiusura dell'applicazione.
 

@@ -59,6 +59,29 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(app.filename_for_song({}, app.DEFAULT_TEMPLATE), "Artista sconosciuto - Senza titolo")
         self.assertLessEqual(len(app.safe_filename("音" * 180).encode("utf-8")), 200)
 
+    def test_column_names_and_language(self):
+        song = {"animeENName": "Attack on Titan", "animeJPName": "Shingeki no Kyojin",
+                "songName": "Song", "songArtist": "Artist", "songType": "Opening 1",
+                "songComposer": "Composer", "songArranger": "Arranger", "animeVintage": "Fall 2013",
+                "animeType": "TV", "songCategory": "Standard", "isDub": True,
+                "isRebroadcast": True, "annId": 42, "annSongId": 43, "amqSongId": 44,
+                "songDifficulty": 0, "songLength": 90, "audio": "file.mp3"}
+        values = ["7", "42", "43", "44", "Fall 2013", "2013", "TV", "Shingeki no Kyojin",
+                  "Dub_Rebroadcast", "Opening 1", "Standard", "Song", "Artist", "Composer",
+                  "Arranger", "0", "90", "Audio"]
+        for field, expected in zip(app.TEMPLATE_COLUMNS, values):
+            with self.subTest(field=field):
+                app.validate_options("mp3", "{" + field + "}")
+                self.assertEqual(app.filename_for_song(song, "{" + field + "}", "JP", 7), expected)
+        self.assertEqual(app.filename_for_song(song, "{anime} - {titolo} - {artista}", "JP"),
+                         "Shingeki no Kyojin - Song - Artist")
+        self.assertEqual(app.filename_for_song({"animeENName": "English"}, "{Anime}", "JP"), "English")
+        self.assertEqual(app.filename_for_song({}, "{Row Number}"), "Non disponibile")
+        with self.assertRaises(ValueError):
+            app.filename_for_song(song, "{Anime}", "IT")
+        with self.assertRaises(ValueError):
+            app.filename_for_song(song, "{Anime}", "JP", True)
+
     def test_invalid_options(self):
         for output_format, template in [
             ("wav", "{titolo}"), (None, "{titolo}"), ("mp3", ""), ("mp3", "{invalid}"),

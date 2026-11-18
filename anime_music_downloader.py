@@ -4,7 +4,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from song_service import DEFAULT_TEMPLATE, OUTPUT_FORMATS, SEARCH_FIELDS, anime_year, download_song, search_songs, validate_options
+from song_service import OUTPUT_FORMATS, SEARCH_FIELDS, anime_year, download_song, search_songs, validate_options
 
 
 def natural_key(value):
@@ -24,7 +24,7 @@ class Application(tk.Tk):
         self.sort_ascending = True
         self.column_titles = {}
         self.output_format = "originale"
-        self.filename_template = DEFAULT_TEMPLATE
+        self.filename_template = "{Artista} - {Titolo}"
         self.directory = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.query = tk.StringVar()
         self.category = tk.StringVar(value="Anime")
@@ -112,9 +112,9 @@ class Application(tk.Tk):
                      state="readonly").pack(fill="x", pady=(4, 12))
         ttk.Label(frame, text="Modello nome file (senza estensione)").pack(anchor="w")
         ttk.Entry(frame, textvariable=template, width=55).pack(fill="x", pady=(4, 8))
-        ttk.Label(frame, text="Segnaposto: {anime}, {titolo}, {artista}, {anno}, {season}, {tipo}",
+        ttk.Label(frame, text="Segnaposto: {Anime}, {Season}, {Anno}, {Tipo}, {Titolo}, {Artista}, {Sorgente}",
                   wraplength=430).pack(anchor="w")
-        ttk.Label(frame, text="Esempio: {anime} - {titolo} - {artista}\n"
+        ttk.Label(frame, text="Esempio: {Anime} - {Titolo} - {Artista}\n"
                   "Le opzioni valgono fino alla chiusura dell'applicazione.",
                   wraplength=430).pack(anchor="w", pady=8)
 
